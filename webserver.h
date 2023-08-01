@@ -40,8 +40,8 @@ public:
     void deal_timer(util_timer *timer, int sockfd);
     bool dealclinetdata();
     bool dealwithsignal(bool& timeout, bool& stop_server);
-    void dealwithread(int sockfd);
     void dealwithwrite(int sockfd);
+    void dealwithread(int sockfd);
 
 public:
     //基础

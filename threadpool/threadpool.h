@@ -19,7 +19,7 @@ public:
     bool append_p(T *request);
 
 private:
-    /*工作线程运行的函数，它不断从工作队列中取出任务并执行之*/
+    /*工作线程运行的函数，它不断从工作队列中取出任务并执行,静态成员函数*/
     static void *worker(void *arg);
     void run();
 
@@ -33,11 +33,12 @@ private:
     connection_pool *m_connPool;  //数据库
     int m_actor_model;          //模型切换
 };
+/*构造函数对每一个线程进行初始化*/
 template <typename T>
 threadpool<T>::threadpool( int actor_model, connection_pool *connPool, int thread_number, int max_requests) : m_actor_model(actor_model),m_thread_number(thread_number), m_max_requests(max_requests), m_threads(NULL),m_connPool(connPool)
 {
     if (thread_number <= 0 || max_requests <= 0)
-        throw std::exception();
+        throw std::exception(); //throw 抛出异常将终止当前的函数
     m_threads = new pthread_t[m_thread_number];
     if (!m_threads)
         throw std::exception();
@@ -108,6 +109,7 @@ void threadpool<T>::run()
             m_queuelocker.unlock();
             continue;
         }
+        //拿出工作队列中的第一个
         T *request = m_workqueue.front();
         m_workqueue.pop_front();
         m_queuelocker.unlock();
@@ -115,6 +117,7 @@ void threadpool<T>::run()
             continue;
         if (1 == m_actor_model)
         {
+            //读 0， 写 1
             if (0 == request->m_state)
             {
                 if (request->read_once())

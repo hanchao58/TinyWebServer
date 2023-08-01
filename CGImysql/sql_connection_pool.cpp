@@ -35,6 +35,7 @@ void connection_pool::init(string url, string User, string PassWord, string DBNa
 	for (int i = 0; i < MaxConn; i++)
 	{
 		MYSQL *con = NULL;
+        //初始化连接句柄
 		con = mysql_init(con);
 
 		if (con == NULL)
@@ -42,6 +43,7 @@ void connection_pool::init(string url, string User, string PassWord, string DBNa
 			LOG_ERROR("MySQL Error");
 			exit(1);
 		}
+        //连接并返回句柄，输入参数为c风格的字符串
 		con = mysql_real_connect(con, url.c_str(), User.c_str(), PassWord.c_str(), DBName.c_str(), Port, NULL, 0);
 
 		if (con == NULL)
@@ -49,6 +51,7 @@ void connection_pool::init(string url, string User, string PassWord, string DBNa
 			LOG_ERROR("MySQL Error");
 			exit(1);
 		}
+        //添加到末尾
 		connList.push_back(con);
 		++m_FreeConn;
 	}

@@ -1,11 +1,13 @@
 #include "lst_timer.h"
 #include "../http/http_conn.h"
+/*升序双向链表，根据超时时间升序排序*/
 
 sort_timer_lst::sort_timer_lst()
 {
     head = NULL;
     tail = NULL;
 }
+//析构函数常规销毁链表
 sort_timer_lst::~sort_timer_lst()
 {
     util_timer *tmp = head;
@@ -28,6 +30,7 @@ void sort_timer_lst::add_timer(util_timer *timer)
         head = tail = timer;
         return;
     }
+    //插入头
     if (timer->expire < head->expire)
     {
         timer->next = head;
@@ -44,10 +47,12 @@ void sort_timer_lst::adjust_timer(util_timer *timer)
         return;
     }
     util_timer *tmp = timer->next;
+    //被调整的定时器在链表尾部
     if (!tmp || (timer->expire < tmp->expire))
     {
         return;
     }
+    //被调整定时器是链表头结点，将定时器取出，重新插入
     if (timer == head)
     {
         head = head->next;
@@ -55,13 +60,17 @@ void sort_timer_lst::adjust_timer(util_timer *timer)
         timer->next = NULL;
         add_timer(timer, head);
     }
+    //被调整定时器在内部，将定时器取出，重新插入
     else
     {
         timer->prev->next = timer->next;
         timer->next->prev = timer->prev;
+        //从
         add_timer(timer, timer->next);
     }
 }
+
+//与调整类似
 void sort_timer_lst::del_timer(util_timer *timer)
 {
     if (!timer)
@@ -108,7 +117,10 @@ void sort_timer_lst::tick()
         {
             break;
         }
+        //调用回调函数
         tmp->cb_func(tmp->user_data);
+        //将处理后的定时器从链表容器中删除，并重置头结点
+        //由于是升序链表
         head = tmp->next;
         if (head)
         {
@@ -121,8 +133,10 @@ void sort_timer_lst::tick()
 
 void sort_timer_lst::add_timer(util_timer *timer, util_timer *lst_head)
 {
+    //缓存头节点及其下一个节点
     util_timer *prev = lst_head;
     util_timer *tmp = prev->next;
+    //遍历，用两个节点插入一个节点
     while (tmp)
     {
         if (timer->expire < tmp->expire)
@@ -180,8 +194,10 @@ void Utils::addfd(int epollfd, int fd, bool one_shot, int TRIGMode)
 void Utils::sig_handler(int sig)
 {
     //为保证函数的可重入性，保留原来的errno
+    //可重入性表示中断后再次进入该函数，环境变量与之前相同，不会丢失数据
     int save_errno = errno;
     int msg = sig;
+    //将信号值从管道写端写入，传输字符类型
     send(u_pipefd[1], (char *)&msg, 1, 0);
     errno = save_errno;
 }
@@ -190,11 +206,15 @@ void Utils::sig_handler(int sig)
 void Utils::addsig(int sig, void(handler)(int), bool restart)
 {
     struct sigaction sa;
+    //创建sigaction结构体变量
     memset(&sa, '\0', sizeof(sa));
+    //注册信号处理函数
     sa.sa_handler = handler;
     if (restart)
         sa.sa_flags |= SA_RESTART;
+    //将所有信号添加到信号集中，mask用来指定在信号处理函数执行期间需要被屏蔽的信号
     sigfillset(&sa.sa_mask);
+    //执行sigaction函数，
     assert(sigaction(sig, &sa, NULL) != -1);
 }
 
@@ -202,6 +222,7 @@ void Utils::addsig(int sig, void(handler)(int), bool restart)
 void Utils::timer_handler()
 {
     m_timer_lst.tick();
+    //设置信号SIGALRM 在经过参数seconds 指定的秒数后传送给目前的进程
     alarm(m_TIMESLOT);
 }
 
@@ -215,8 +236,11 @@ int *Utils::u_pipefd = 0;
 int Utils::u_epollfd = 0;
 
 class Utils;
+
+//回调函数
 void cb_func(client_data *user_data)
 {
+    //删除非活动连接在socket上的注册事件
     epoll_ctl(Utils::u_epollfd, EPOLL_CTL_DEL, user_data->sockfd, 0);
     assert(user_data);
     close(user_data->sockfd);

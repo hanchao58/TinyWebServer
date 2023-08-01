@@ -13,6 +13,7 @@
 #include "../lock/locker.h"
 using namespace std;
 
+//模板类
 template <class T>
 class block_queue
 {
@@ -130,7 +131,7 @@ public:
         m_mutex.lock();
         if (m_size >= m_max_size)
         {
-
+            
             m_cond.broadcast();
             m_mutex.unlock();
             return false;
@@ -140,7 +141,7 @@ public:
         m_array[m_back] = item;
 
         m_size++;
-
+        //唤醒所有使用队列的线程
         m_cond.broadcast();
         m_mutex.unlock();
         return true;
@@ -150,9 +151,10 @@ public:
     {
 
         m_mutex.lock();
+        //没有元素
         while (m_size <= 0)
         {
-            
+            //抢到互斥锁，返回0
             if (!m_cond.wait(m_mutex.get()))
             {
                 m_mutex.unlock();

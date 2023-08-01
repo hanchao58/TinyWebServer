@@ -34,7 +34,7 @@ private:
 	int m_CurConn;  //当前已使用的连接数
 	int m_FreeConn; //当前空闲的连接数
 	locker lock;
-	list<MYSQL *> connList; //连接池
+	list<MYSQL *> connList; //连接池，双向链表list容器
 	sem reserve;
 
 public:

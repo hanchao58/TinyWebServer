@@ -76,6 +76,7 @@ public:
     void init(int sockfd, const sockaddr_in &addr, char *, int, int, string user, string passwd, string sqlname);
     void close_conn(bool real_close = true);
     void process();
+    //读取浏览器端数据
     bool read_once();
     bool write();
     sockaddr_in *get_address()
@@ -131,7 +132,9 @@ private:
     long m_content_length;
     bool m_linger;
     char *m_file_address;
-    struct stat m_file_stat;
+    //将文件属性存储在结构体stat;
+    struct stat m_file_stat; 
+    //数据地址及其长度
     struct iovec m_iv[2];
     int m_iv_count;
     int cgi;        //是否启用的POST

@@ -99,10 +99,12 @@ public:
         //pthread_mutex_unlock(&m_mutex);
         return ret == 0;
     }
+    //唤醒正在pthread_cond_wait(&cond1,&mutex1)的一个线程
     bool signal()
     {
         return pthread_cond_signal(&m_cond) == 0;
     }
+    //唤醒所有正在pthread_cond_wait(&cond1,&mutex1)的线程
     bool broadcast()
     {
         return pthread_cond_broadcast(&m_cond) == 0;

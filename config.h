@@ -8,8 +8,9 @@ using namespace std;
 class Config
 {
 public:
-    Config();
-    ~Config(){};
+
+    Config();   //构造函数
+    ~Config(){}; //析构函数
 
     void parse_arg(int argc, char*argv[]);
 

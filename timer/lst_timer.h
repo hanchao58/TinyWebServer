@@ -26,6 +26,7 @@
 
 class util_timer;
 
+//连接资源
 struct client_data
 {
     sockaddr_in address;
@@ -39,11 +40,15 @@ public:
     util_timer() : prev(NULL), next(NULL) {}
 
 public:
+    //超时时间
     time_t expire;
-    
+    //回调函数
     void (* cb_func)(client_data *);
+    //连接资源
     client_data *user_data;
+    //前向定时器
     util_timer *prev;
+    //后继定时器
     util_timer *next;
 };
 
@@ -92,6 +97,7 @@ public:
 
 public:
     static int *u_pipefd;
+    //创建定时器容器链表
     sort_timer_lst m_timer_lst;
     static int u_epollfd;
     int m_TIMESLOT;

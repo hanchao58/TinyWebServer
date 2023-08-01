@@ -2,18 +2,19 @@
 
 WebServer::WebServer()
 {
-    //http_conn类对象
+    //创建http_conn类对象
     users = new http_conn[MAX_FD];
 
     //root文件夹路径
     char server_path[200];
     getcwd(server_path, 200);
+    //绝对路径
     char root[6] = "/root";
     m_root = (char *)malloc(strlen(server_path) + strlen(root) + 1);
     strcpy(m_root, server_path);
-    strcat(m_root, root);
+    strcat(m_root, root); //追加
 
-    //定时器
+    //创建连接资源数组
     users_timer = new client_data[MAX_FD];
 }
 
@@ -90,7 +91,7 @@ void WebServer::sql_pool()
     m_connPool = connection_pool::GetInstance();
     m_connPool->init("localhost", m_user, m_passWord, m_databaseName, 3306, m_sql_num, m_close_log);
 
-    //初始化数据库读取表
+    //初始化数据库读取数据表(用户名、密码)
     users->initmysql_result(m_connPool);
 }
 
@@ -103,13 +104,18 @@ void WebServer::thread_pool()
 void WebServer::eventListen()
 {
     //网络编程基础步骤
-    m_listenfd = socket(PF_INET, SOCK_STREAM, 0);
+    m_listenfd = socket(PF_INET, SOCK_STREAM, 0);//ipv4，面向连接，tcp的连接方式
     assert(m_listenfd >= 0);
-
     //优雅关闭连接
+    /*
+    *   0   调用close立即返回，并正常挥手 
+    *   1   0   立刻关闭连接，发送RST
+    *   1   !0  设置缓冲区发送的超时时间 
+    */
     if (0 == m_OPT_LINGER)
     {
         struct linger tmp = {0, 1};
+        //SO_LINGER 延迟关闭连接
         setsockopt(m_listenfd, SOL_SOCKET, SO_LINGER, &tmp, sizeof(tmp));
     }
     else if (1 == m_OPT_LINGER)
@@ -126,7 +132,7 @@ void WebServer::eventListen()
     address.sin_port = htons(m_port);
 
     int flag = 1;
-    setsockopt(m_listenfd, SOL_SOCKET, SO_REUSEADDR, &flag, sizeof(flag));
+    setsockopt(m_listenfd, SOL_SOCKET, SO_REUSEADDR, &flag, sizeof(flag)); //允许重用本地地址和端口
     ret = bind(m_listenfd, (struct sockaddr *)&address, sizeof(address));
     assert(ret >= 0);
     ret = listen(m_listenfd, 5);
@@ -138,13 +144,20 @@ void WebServer::eventListen()
     epoll_event events[MAX_EVENT_NUMBER];
     m_epollfd = epoll_create(5);
     assert(m_epollfd != -1);
-
+   //将listenfd放在epoll树上
     utils.addfd(m_epollfd, m_listenfd, false, m_LISTENTrigmode);
+    //将上述epollfd赋值给http类对象的m_epollfd属性
     http_conn::m_epollfd = m_epollfd;
 
+
+    /*定时器信号处理*/
+
+    //创建一对管道套接字
     ret = socketpair(PF_UNIX, SOCK_STREAM, 0, m_pipefd);
     assert(ret != -1);
+    //设置写端非阻塞
     utils.setnonblocking(m_pipefd[1]);
+    //读端为ET非阻塞
     utils.addfd(m_epollfd, m_pipefd[0], false, 0);
 
     utils.addsig(SIGPIPE, SIG_IGN);
@@ -157,7 +170,7 @@ void WebServer::eventListen()
     Utils::u_pipefd = m_pipefd;
     Utils::u_epollfd = m_epollfd;
 }
-
+//处理完客户端数据调用
 void WebServer::timer(int connfd, struct sockaddr_in client_address)
 {
     users[connfd].init(connfd, client_address, m_root, m_CONNTrigmode, m_close_log, m_user, m_passWord, m_databaseName);
@@ -167,11 +180,14 @@ void WebServer::timer(int connfd, struct sockaddr_in client_address)
     users_timer[connfd].address = client_address;
     users_timer[connfd].sockfd = connfd;
     util_timer *timer = new util_timer;
+    //设置定时器对应的连接资源，回调函数，超时时间
     timer->user_data = &users_timer[connfd];
     timer->cb_func = cb_func;
     time_t cur = time(NULL);
     timer->expire = cur + 3 * TIMESLOT;
+    //创建该连接对应的定时器
     users_timer[connfd].timer = timer;
+    //添加到链表
     utils.m_timer_lst.add_timer(timer);
 }
 
@@ -185,7 +201,7 @@ void WebServer::adjust_timer(util_timer *timer)
 
     LOG_INFO("%s", "adjust timer once");
 }
-
+//删除定时器
 void WebServer::deal_timer(util_timer *timer, int sockfd)
 {
     timer->cb_func(&users_timer[sockfd]);
@@ -196,11 +212,12 @@ void WebServer::deal_timer(util_timer *timer, int sockfd)
 
     LOG_INFO("close fd %d", users_timer[sockfd].sockfd);
 }
-
+//处理客户端数据
 bool WebServer::dealclinetdata()
 {
     struct sockaddr_in client_address;
     socklen_t client_addrlength = sizeof(client_address);
+    //LT水平触发
     if (0 == m_LISTENTrigmode)
     {
         int connfd = accept(m_listenfd, (struct sockaddr *)&client_address, &client_addrlength);
@@ -217,7 +234,7 @@ bool WebServer::dealclinetdata()
         }
         timer(connfd, client_address);
     }
-
+    //ET边缘触发
     else
     {
         while (1)
@@ -246,6 +263,7 @@ bool WebServer::dealwithsignal(bool &timeout, bool &stop_server)
     int ret = 0;
     int sig;
     char signals[1024];
+    //读出信号值返回字节数，总是1，表示信号值对应的字符
     ret = recv(m_pipefd[0], signals, sizeof(signals), 0);
     if (ret == -1)
     {
@@ -261,11 +279,13 @@ bool WebServer::dealwithsignal(bool &timeout, bool &stop_server)
         {
             switch (signals[i])
             {
+                //超时
             case SIGALRM:
             {
                 timeout = true;
                 break;
             }
+            //终止
             case SIGTERM:
             {
                 stop_server = true;
@@ -291,7 +311,7 @@ void WebServer::dealwithread(int sockfd)
 
         //若监测到读事件，将该事件放入请求队列
         m_pool->append(users + sockfd, 0);
-
+        //users[sockfd]，即sockfd对应的http连接对象
         while (true)
         {
             if (1 == users[sockfd].improv)
@@ -308,7 +328,7 @@ void WebServer::dealwithread(int sockfd)
     }
     else
     {
-        //proactor
+        //proactor，读并缓存数据
         if (users[sockfd].read_once())
         {
             LOG_INFO("deal with the client(%s)", inet_ntoa(users[sockfd].get_address()->sin_addr));
@@ -318,6 +338,8 @@ void WebServer::dealwithread(int sockfd)
 
             if (timer)
             {
+                //若有数据传输，则将定时器往后延迟3个单位
+                //对其在链表上的位置进行调整
                 adjust_timer(timer);
             }
         }
@@ -373,7 +395,7 @@ void WebServer::dealwithwrite(int sockfd)
         }
     }
 }
-
+//服务器处理事件，包括：服务器接收http请求
 void WebServer::eventLoop()
 {
     bool timeout = false;
@@ -387,7 +409,7 @@ void WebServer::eventLoop()
             LOG_ERROR("%s", "epoll failure");
             break;
         }
-
+        //对所有就绪事件进行处理
         for (int i = 0; i < number; i++)
         {
             int sockfd = events[i].data.fd;
@@ -395,6 +417,7 @@ void WebServer::eventLoop()
             //处理新到的客户连接
             if (sockfd == m_listenfd)
             {
+                //accept
                 bool flag = dealclinetdata();
                 if (false == flag)
                     continue;
@@ -405,9 +428,10 @@ void WebServer::eventLoop()
                 util_timer *timer = users_timer[sockfd].timer;
                 deal_timer(timer, sockfd);
             }
-            //处理信号
+            //监听管道处理定时器信号
             else if ((sockfd == m_pipefd[0]) && (events[i].events & EPOLLIN))
             {
+                //recv
                 bool flag = dealwithsignal(timeout, stop_server);
                 if (false == flag)
                     LOG_ERROR("%s", "dealclientdata failure");
@@ -417,11 +441,13 @@ void WebServer::eventLoop()
             {
                 dealwithread(sockfd);
             }
+            //接收到写事件
             else if (events[i].events & EPOLLOUT)
             {
                 dealwithwrite(sockfd);
             }
         }
+        //超时处理，调用定时处理函数并发送超时信号
         if (timeout)
         {
             utils.timer_handler();
